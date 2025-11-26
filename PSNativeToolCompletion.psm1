@@ -1,5 +1,8 @@
 using namespace System.Management.Automation.Language
 
+$fsprod = Get-PSProvider -PSProvider FileSystem -ErrorAction Stop
+$Script:CompDir = Join-Path $fsprod.Home '.pwsh' 'completions'
+
 [scriptblock]$cover_all_completion = {
     param(
         [string] $wordToComplete,
@@ -7,9 +10,8 @@ using namespace System.Management.Automation.Language
         [int] $cursorPosition
     )
 
-    $compDir = Join-Path $PSScriptRoot 'completion'
     $command = [System.IO.Path]::GetFileNameWithoutExtension($commandAst.GetCommandName())
-    $compFile = Join-Path $compDir "__${command}.ps1"
+    $compFile = Join-Path $Script:CompDir "__${command}.ps1"
 
     if (Test-Path $compFile) {
         $compAst = [Parser]::ParseFile($compFile, [ref]$null, [ref]$null)
