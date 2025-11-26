@@ -20,7 +20,7 @@ jobs:
     - name: Publish Module locally
       shell: pwsh
       run: |
-        $moduleDir = mkdir ./out/PSNativeToolCompletion -ErrorAction Stop
+        $moduleDir = New-Item -ItemType Directory -Path ./out/PSNativeToolCompletion -ErrorAction Stop
         Copy-Item -Path ./*.psm1, ./*.psd1 -Destination $moduleDir
         Get-ChildItem -Path $moduleDir | Out-String -Width 120
 
