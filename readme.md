@@ -1,7 +1,7 @@
 ## PSNativeToolCompletion
 
 This PowerShell module enables lazy loading of argument completion scripts for native commands.
-It leverages the new 'fall-back' completer for native commands -- `Register-ArgumentCompleter -NativeFallback`.
+It leverages the new 'fall-back' completer for native commands -- `Register-ArgumentCompleter -NativeFallback` (introduced in PowerShell v7.6).
 
 When tab completion is triggered for a native command,
 it checks for a corresponding completion script,

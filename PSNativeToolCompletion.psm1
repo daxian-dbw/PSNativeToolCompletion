@@ -60,4 +60,57 @@ $Script:CompDir = Join-Path $fsprod.Home '.pwsh' 'completions'
     }
 }
 
+## Register the 'fall-back' completer for native commands.
 Register-ArgumentCompleter -NativeFallback -ScriptBlock $cover_all_completion
+
+function Get-CompletionScript {
+    param(
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Position = 0)]
+        [string[]] $Command
+    )
+
+    Write-Verbose "Completion script folder: $Script:CompDir"
+
+    if (Test-Path $Script:CompDir) {
+        try {
+            Push-Location $Script:CompDir
+
+            if ($Command) {
+                $processedNames = $Command | ForEach-Object { "__$_.ps1" }
+                Get-ChildItem $processedNames
+            }
+            else {
+                Get-ChildItem
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+}
+
+function Add-CompletionScript {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Command,
+
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
+        [AllowEmptyString()]
+        [string] $InputScript
+    )
+
+    Begin {
+        $list = [System.Collections.Generic.List[string]]::new()
+    }
+
+    Process {
+        $list.Add($InputScript)
+    }
+
+    End {
+        $script = $list.Count -gt 1 ? $list -join "`n" : $list[0]
+        $path = Join-Path $Script:CompDir "__$Command.ps1"
+        Set-Content -Path $path -Value $script -ErrorAction Stop
+    }
+}
