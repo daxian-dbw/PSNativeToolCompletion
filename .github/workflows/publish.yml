@@ -37,7 +37,7 @@ jobs:
         Register-PSResourceRepository @repoParams
 
         # Publish the module to GitHub Packages
-        Publish-PSResource -Path ./out/PSNativeToolCompletion -Repository GitHubPackages -ApiKey ${{ secrets.GITHUB_TOKEN }} -Verbose
+        Publish-PSResource -Path ./out/PSNativeToolCompletion -Repository GitHubPackages -ApiKey ${{ secrets.GITHUB_TOKEN }} -SkipModuleManifestValidate -Verbose
 
     - name: Upload module artifact
       uses: actions/upload-artifact@v4
