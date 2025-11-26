@@ -1,0 +1,47 @@
+name: Publish Module
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Publish Module locally
+      shell: pwsh
+      run: |
+        $moduleDir = mkdir ./out/PSNativeToolCompletion -ErrorAction Stop
+        Copy-Item -Path ./*.psm1, ./*.psd1 -Destination $moduleDir
+        Get-ChildItem -Path $moduleDir | Out-String -Width 120
+
+    - name: Publish Module to GitHub Packages
+      shell: pwsh
+      run: |
+        # Register GitHub Packages as a PSRepository
+        $repoParams = @{
+            Name = 'GitHubPackages'
+            Uri = 'https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json'
+            Trusted = $true
+            ApiVersion = 'V3'
+        }
+        Register-PSResourceRepository @repoParams
+
+        # Publish the module to GitHub Packages
+        Publish-PSResource -Path ./out/PSNativeToolCompletion -Repository GitHubPackages -ApiKey ${{ secrets.GITHUB_TOKEN }} -Verbose
+
+    - name: Upload module artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PSNativeToolCompletion-Module
+        path: out/PSNativeToolCompletion
+        retention-days: 90

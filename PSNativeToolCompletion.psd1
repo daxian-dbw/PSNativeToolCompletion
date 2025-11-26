@@ -38,7 +38,7 @@ PrivateData = @{
 
     PSData = @{
         # A URL to the main website for this project.
-        ProjectUri = ''
+        ProjectUri = 'https://github.com/daxian-dbw/PSNativeToolCompletion'
     }
 
 }
