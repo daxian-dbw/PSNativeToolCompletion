@@ -3,6 +3,10 @@ using namespace System.Management.Automation.Language
 $fsprod = Get-PSProvider -PSProvider FileSystem -ErrorAction Stop
 $Script:CompDir = Join-Path $fsprod.Home '.pwsh' 'completions'
 
+if (-not (Test-Path $Script:CompDir -PathType Container)) {
+    $null = New-Item $Script:CompDir -ItemType Directory -ErrorAction Stop
+}
+
 [scriptblock]$cover_all_completion = {
     param(
         [string] $wordToComplete,
