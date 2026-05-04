@@ -80,7 +80,10 @@ function Add-CompletionScript {
 
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [AllowEmptyString()]
-        [string] $InputScript
+        [string] $InputScript,
+
+        [Parameter()]
+        [switch] $AllowExtensionCompletion
     )
 
     Begin {
@@ -95,6 +98,10 @@ function Add-CompletionScript {
         $script = $list.Count -gt 1 ? $list -join "`n" : $list[0]
         $path = Join-Path $Script:CompDir "__$Command.ps1"
         Set-Content -Path $path -Value $script -NoNewline -ErrorAction Stop
+
+        if ($AllowExtensionCompletion) {
+            WrapNativeCompleter -ScriptPath $path -Overwrite
+        }
     }
 }
 
@@ -174,7 +181,7 @@ function WrapperScript {
 }
 
 function WrapNativeCompleter {
-    param([string] $ScriptPath)
+    param([string] $ScriptPath, [switch] $Overwrite)
 
     $ScriptPath = (Resolve-Path $ScriptPath).ProviderPath
     $compAst = [Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
@@ -223,7 +230,9 @@ ${indents}
         if ($normalizeCR) {
             $insertText = $insertText.Replace("`r`n", "`n")
         }
-        $content.Insert($cmdAst.Extent.StartOffset, $insertText) | Set-Content "$ScriptPath.bak" -NoNewline -ErrorAction Stop
+
+        $target = $Overwrite ? $ScriptPath : "$ScriptPath.bak"
+        $content.Insert($cmdAst.Extent.StartOffset, $insertText) | Set-Content $target -NoNewline -ErrorAction Stop
     }
 }
 
