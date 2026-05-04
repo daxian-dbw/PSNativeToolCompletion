@@ -94,22 +94,26 @@ function Add-CompletionScript {
     End {
         $script = $list.Count -gt 1 ? $list -join "`n" : $list[0]
         $path = Join-Path $Script:CompDir "__$Command.ps1"
-        Set-Content -Path $path -Value $script -ErrorAction Stop
+        Set-Content -Path $path -Value $script -NoNewline -ErrorAction Stop
     }
 }
 
 $Script:WrapSbName = '__wrap_completer'
 $Script:WrapSbContent = @'
-$__wrap_completer = {
+${{__wrap_completer}} = {{
     param($WordToComplete, $CommandAst, $CursorPosition)
 
-    $result = & ${0} $WordToComplete $CommandAst $CursorPosition
-    if ($null -ne $result -and ($result -isnot [string] -or $result -ne '')) {
-        return $result
-    }
+    try {{
+        $result = & ${0} $WordToComplete $CommandAst $CursorPosition
+        if ($null -ne $result -and ($result -isnot [string] -or $result -ne '')) {{
+            return $result
+        }}
+    }} catch {{
+        ## Exception thrown. No completion results.
+    }}
 
     {1}
-}
+}}
 '@
 
 $Script:ExtensionSb = {
@@ -137,7 +141,7 @@ $Script:ExtensionSb = {
 
     if ($command) {
         $prefix = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
-        if ($command.EndsWith($WordToComplete)) {
+        if ($WordToComplete -and $command.EndsWith($WordToComplete)) {
             $candidates = [System.IO.Directory]::EnumerateFiles($PSScriptRoot, "${prefix}${command}*.ps1") |
                 ForEach-Object {
                     $name = [System.IO.Path]::GetFileNameWithoutExtension($_)
@@ -161,12 +165,12 @@ $Script:ExtensionSb = {
 }
 
 function WrapperScript {
-    param($compSbVerName)
+    param($CompSbVerName)
 
     $extSbAst = $Script:ExtensionSb.Ast
     $endBlockText = $extSbAst.EndBlock.Extent.Text
     $paramBlockText = $extSbAst.ParamBlock.Extent.Text
-    $Script:WrapSbContent -f $compSbVerName, $endBlockText.SubString($paramBlockText.Length)
+    $Script:WrapSbContent -f $CompSbVerName, $endBlockText.SubString($paramBlockText.Length)
 }
 
 function WrapNativeCompleter {
@@ -176,44 +180,50 @@ function WrapNativeCompleter {
     $compAst = [Parser]::ParseFile($ScriptPath, [ref]$null, [ref]$null)
     $completer = Find-NativeCompleter -CompAst $compAst
 
-    if ($completer -is [VariableExpressionAst]) {
-        ## Add the following line right before the 'Register-ArgumentCompleter' command in the AST:
-        ## . $PSScriptRoot\<variable_name>.ps1
+    if ($completer) {
         $cmdAst = $completer.Parent
-        $content = Get-Content $ScriptPath -Raw
+        $indents = ' ' * $cmdAst.Extent.StartColumn
+    }
 
-        $sbVarName = $sbArgument.VariablePath.UserPath
+    if ($completer -is [VariableExpressionAst]) {
+        ## Insert the wrapper script block definition.
+        $sbVarName = $completer.VariablePath.UserPath
+        $wrapper = WrapperScript -CompSbVerName $sbVarName
         $insertText = @"
-. $PSScriptRoot\<variable_name>.ps1 $sbVarName
+${wrapper}
 
-$(' ' * $cmdAst.Extent.StartColumn)
+${indents}
 "@
-        $content.Insert($cmdAst.Extent.StartOffset, $insertText) | Set-Content "$ScriptPath.bak" -ErrorAction Stop
     }
     elseif ($completer -is [ScriptBlockExpressionAst]) {
-        ## 1. Remove the 'register-argumentcompleter' command;
-        ## 2. Assign the script block to a variable, and then add the following line;
-        ## 3. Add the following line right;
-        ## 4. Add the 'register-argumentcompleter' command back to the end of the script, with the script block variable as the argument of the '-ScriptBlock' parameter.
-        $cmdAst = $completer.Parent
-        $content = Get-Content $ScriptPath -Raw
-
-        $sbText = $completer.Extent.Text
-        $sbVarName = '__wrap_completer'
-        $content = $content.Replace($sbText, "`$$sbVarName")
-
-        $indents = ' ' * $cmdAst.Extent.StartColumn
+        $wrapper = WrapperScript -CompSbVerName '__original_completer'
         $insertText = @"
-`$$sbVarName = $sbText
+`${__original_completer} = $sbText
 
-$indents. $PSScriptRoot\<variable_name>.ps1 $sbVarName
+${indents}${wrapper}
 
-$indents
+${indents}
 "@
-        $content.Insert($cmdAst.Extent.StartOffset, $insertText) | Set-Content "$ScriptPath.bak" -ErrorAction Stop
     }
     else {
         throw "Unsupported script block argument type: $($completer.GetType().FullName)"
+    }
+
+    if ($insertText) {
+        $content = Get-Content $ScriptPath -Raw
+        $normalizeCR = $IsWindows -and -not $content.Contains("`r`n")
+
+        ## Replace the original completer script block variable with the new wrapper script block variable.
+        $start = $completer.Extent.StartOffset
+        $length = $completer.Extent.Text.Length
+        $content = $content.Remove($start, $length)
+        $content = $content.Insert($start, "`${$Script:WrapSbName}")
+
+        ## Insert the wrapper script block definition.
+        if ($normalizeCR) {
+            $insertText = $insertText.Replace("`r`n", "`n")
+        }
+        $content.Insert($cmdAst.Extent.StartOffset, $insertText) | Set-Content "$ScriptPath.bak" -NoNewline -ErrorAction Stop
     }
 }
 
