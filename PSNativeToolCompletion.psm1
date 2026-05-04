@@ -26,40 +26,19 @@ if (-not (Test-Path $Script:CompDir -PathType Container)) {
         $compModule = Import-Module $compModule -Global -PassThru
 
         ## Try to trigger the completion script block for the current tab.
-        $cmdAst = $compAst.Find({
-            param($ast)
-            $ast -is [CommandAst] -and $ast.GetCommandName() -eq 'Register-ArgumentCompleter'
-        }, $false)
+        $toolCompSb = $null
+        $sbArgument = Find-NativeCompleter -CompAst $compAst
 
-        if ($cmdAst) {
-            $sbArgIndex = [int]::MaxValue
-            $elements = $cmdAst.CommandElements
+        if ($sbArgument -is [VariableExpressionAst]) {
+            $sbVarName = $sbArgument.VariablePath.UserPath
+            $toolCompSb = & $compModule Get-Variable $sbVarName -ValueOnly
+        }
+        elseif ($sbArgument -is [ScriptBlockExpressionAst]) {
+            $toolCompSb = $sbArgument.ScriptBlock.GetScriptBlock()
+        }
 
-            for ($i = 1; $i -lt $elements.Count; $i++) {
-                $item = $elements[$i]
-                if ($item -is [CommandParameterAst] -and $item.ParameterName -eq 'ScriptBlock') {
-                    ## Found the '-ScriptBlock' parameter. The next element will be the argument.
-                    $sbArgIndex = $i + 1
-                    break
-                }
-            }
-
-            if ($sbArgIndex -lt $elements.Count) {
-                $toolCompSb = $null
-                $sbArgument = $elements[$sbArgIndex]
-
-                if ($sbArgument -is [VariableExpressionAst]) {
-                    $sbVarName = $sbArgument.VariablePath.UserPath
-                    $toolCompSb = & $compModule Get-Variable $sbVarName -ValueOnly
-                }
-                elseif ($sbArgument -is [ScriptBlockExpressionAst]) {
-                    $toolCompSb = $sbArgument.ScriptBlock.GetScriptBlock()
-                }
-
-                if ($toolCompSb) {
-                    & $compModule $toolCompSb $wordToComplete $commandAst $cursorPosition
-                }
-            }
+        if ($toolCompSb) {
+            & $compModule $toolCompSb $wordToComplete $commandAst $cursorPosition
         }
     }
 }
@@ -241,7 +220,7 @@ $indents
 function Find-NativeCompleter {
     param([ScriptBlockAst] $CompAst)
 
-    $cmdAst = $compAst.Find({
+    $cmdAst = $CompAst.Find({
         param($ast)
         $ast -is [CommandAst] -and $ast.GetCommandName() -eq 'Register-ArgumentCompleter'
     }, $false)
