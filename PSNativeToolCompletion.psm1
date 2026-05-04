@@ -35,7 +35,7 @@ if (-not (Test-Path $Script:CompDir -PathType Container)) {
             $sbArgIndex = [int]::MaxValue
             $elements = $cmdAst.CommandElements
 
-            for ($i = 1; $i -le $elements.Count; $i++) {
+            for ($i = 1; $i -lt $elements.Count; $i++) {
                 $item = $elements[$i]
                 if ($item -is [CommandParameterAst] -and $item.ParameterName -eq 'ScriptBlock') {
                     ## Found the '-ScriptBlock' parameter. The next element will be the argument.
@@ -44,7 +44,7 @@ if (-not (Test-Path $Script:CompDir -PathType Container)) {
                 }
             }
 
-            if ($sbArgIndex -le $elements.Count) {
+            if ($sbArgIndex -lt $elements.Count) {
                 $toolCompSb = $null
                 $sbArgument = $elements[$sbArgIndex]
 
