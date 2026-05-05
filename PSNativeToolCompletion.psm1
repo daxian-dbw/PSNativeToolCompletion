@@ -203,6 +203,7 @@ ${indents}
 "@
     }
     elseif ($completer -is [ScriptBlockExpressionAst]) {
+        $sbText = $completer.Extent.Text
         $wrapper = WrapperScript -CompSbVerName '__original_completer'
         $insertText = @"
 `${__original_completer} = $sbText
