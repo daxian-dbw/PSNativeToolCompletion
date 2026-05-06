@@ -163,8 +163,26 @@ $Script:ExtensionSb = {
             }
         }
         else {
-            $extensionScript = Join-Path $PSScriptRoot "${prefix}${command}.ps1"
-            if (Test-Path $extensionScript -PathType Leaf) {
+            $suffix = $command
+            $underbarIndex = $command.Length
+
+            ## Find the most specific extension script for the command and invoke it.
+            while ($true) {
+                $extensionScript = Join-Path $PSScriptRoot "${prefix}${suffix}.ps1"
+                if (Test-Path $extensionScript -PathType Leaf) {
+                    break;
+                }
+
+                $underbarIndex = $suffix.LastIndexOf('_', $underbarIndex - 1)
+                if ($underbarIndex -gt 0) {
+                    $suffix = $suffix.Remove($underbarIndex)
+                } else {
+                    $extensionScript = $null
+                    break
+                }
+            }
+
+            if ($extensionScript) {
                 return & $extensionScript $WordToComplete $CommandAst $CursorPosition
             }
         }
