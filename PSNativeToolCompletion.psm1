@@ -147,7 +147,9 @@ $Script:ExtensionSb = {
     }
 
     if ($command) {
+        $suffixEndIndex = $command.Length
         $prefix = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
+
         if ($WordToComplete -and $command.EndsWith($WordToComplete)) {
             $candidates = [System.IO.Directory]::EnumerateFiles($PSScriptRoot, "${prefix}${command}*.ps1") |
                 ForEach-Object {
@@ -161,30 +163,28 @@ $Script:ExtensionSb = {
             if ($candidates) {
                 return $candidates
             }
+
+            $suffixEndIndex = $command.LastIndexOf('_', $suffixEndIndex)
         }
-        else {
-            $suffix = $command
-            $underbarIndex = $command.Length
 
-            ## Find the most specific extension script for the command and invoke it.
-            while ($true) {
-                $extensionScript = Join-Path $PSScriptRoot "${prefix}${suffix}.ps1"
-                if (Test-Path $extensionScript -PathType Leaf) {
-                    break;
-                }
-
-                $underbarIndex = $suffix.LastIndexOf('_', $underbarIndex - 1)
-                if ($underbarIndex -gt 0) {
-                    $suffix = $suffix.Remove($underbarIndex)
-                } else {
-                    $extensionScript = $null
-                    break
-                }
+        ## Find the most specific extension script for the command and invoke it.
+        ## Take the input 'dotent whatif orz b<tab>' as an example, we will try finding the following files in order:
+        ##   1. __dotnet_whatif_orz.ps1
+        ##   2. __dotnet_what.ps1
+        ## The prefix part is '__dotnet', and the suffix part slides from '_whatif_orz' to '_whatif'.
+        while ($suffixEndIndex -gt 0) {
+            $suffix = ($suffix ?? $command).Remove($suffixEndIndex)
+            $extensionScript = Join-Path $PSScriptRoot "${prefix}${suffix}.ps1"
+            if (Test-Path $extensionScript -PathType Leaf) {
+                break;
             }
 
-            if ($extensionScript) {
-                return & $extensionScript $WordToComplete $CommandAst $CursorPosition
-            }
+            $extensionScript = $null
+            $suffixEndIndex = $suffix.LastIndexOf('_', $suffixEndIndex)
+        }
+
+        if ($extensionScript) {
+            return & $extensionScript $WordToComplete $CommandAst $CursorPosition
         }
     }
 }
